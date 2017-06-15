@@ -23,6 +23,9 @@ def download(packagename):
     
     response = R.urlopen('https://github.com/purpys/'+packagename+'/archive/master.zip') #TODO: Implement versioning
     zipcontent = response.read()
+
+    sha=__get_sha_master(packagename)
+    
     s=I.BytesIO(zipcontent)
     try:
         z=Z.ZipFile(s,'r')
@@ -45,6 +48,12 @@ def download(packagename):
                 z.extract(i, path)
 
     z.close()
+
+    import os
+    with open(os.path.join(path,packagename,".sha"),'w') as f:
+        f.write(sha)
+    
+    
     return True
 
 def __import(packagename):
@@ -57,6 +66,8 @@ def install(packagename):
     import shutil
     
     if os.path.exists(os.path.join(__get_module_path(), packagename)):
+        if has_update(packagename):
+            print("There is an update available for this package.")
         return __import(packagename)
     
     if os.path.exists(os.path.join(__get_cache_path(),packagename)):
@@ -82,7 +93,38 @@ def reinstall(packagename):
             shutil.move(os.path.join(__get_cache_path(),packagename),os.path.join(__get_module_path(), packagename))
             return __import(packagename)
         else:
-            print("ERROR:\tDownloading package failed!")    
+            print("ERROR:\tDownloading package failed!")
+
+def __get_sha_master(packagename):
+    import json
+    import urllib.request as R
+    version_response = R.urlopen('https://api.github.com/repos/purpys/'+packagename+'/branches/master')
+    version = version_response.read()
+    d=json.loads(version.decode('UTF-8'))
+    sha=d["commit"]["sha"]    
+    return sha
+
+def __sha_path(packagename):
+    import os
+    return os.path.join(__get_module_path(), packagename, ".sha")
+
+def __read_sha(packagename):
+    import os
+    with open(__sha_path(packagename),'r') as f:
+        return f.read()
+
+def has_update(packagename):
+    sha=__read_sha(packagename)
+    sha2=__get_sha_master(packagename)
+    return sha!=sha2
+    
+def update(packagename):
+    if has_update(packagename):
+        print("Updating package to newest version")
+        uninstall(packagename)
+        return install(packagename)
+    else:
+        print("Package is already newest version")
     
 def uninstall(packagename):
     import os
