@@ -84,7 +84,7 @@ def is_downloaded(packagename):
     return os.path.exists(os.path.join(__get_cache_path(),packagename))
 
 def install(packagename):
-    import shutil
+    import shutil, os
     
     if is_installed(packagename):
         if has_update(packagename):
