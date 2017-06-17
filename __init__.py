@@ -16,10 +16,24 @@ def __create_cache_dir():
     import os
     os.mkdir(__get_cache_path())
 
+def __get_available_packages():
+    import urllib.request as R
+    import json
+    preresponse=R.urlopen('https://api.github.com/orgs/purpys/repos')
+    names=[i["name"] for i in json.loads(preresponse.read().decode('UTF-8'))]
+    return names
+
+def exists(packagename):
+    return packagename in __get_available_packages()
+
 def download(packagename):
     import urllib.request as R
     import io as I
     import zipfile as Z
+
+    if not exists(packagename):
+        print("ERROR: Package does not exist")
+        return False
     
     response = R.urlopen('https://github.com/purpys/'+packagename+'/archive/master.zip') #TODO: Implement versioning
     zipcontent = response.read()
@@ -61,16 +75,23 @@ def __import(packagename):
     globals()[packagename]=importlib.import_module('purpys.'+packagename)
     return True
 
-def install(packagename):
+def is_installed(packagename):
     import os
+    return os.path.exists(os.path.join(__get_module_path(), packagename))
+
+def is_downloaded(packagename):
+    import os
+    return os.path.exists(os.path.join(__get_cache_path(),packagename))
+
+def install(packagename):
     import shutil
     
-    if os.path.exists(os.path.join(__get_module_path(), packagename)):
+    if is_installed(packagename):
         if has_update(packagename):
             print("There is an update available for this package.")
         return __import(packagename)
     
-    if os.path.exists(os.path.join(__get_cache_path(),packagename)):
+    if is_downloaded(packagename):
         shutil.move(os.path.join(__get_cache_path(),packagename),os.path.join(__get_module_path(), packagename))
         return __import(packagename)
     else:
@@ -85,7 +106,7 @@ def reinstall(packagename):
     import os
     import shutil
     
-    if os.path.exists(os.path.join(__get_cache_path(),packagename)):
+    if is_downloaded(packagename):
         shutil.move(os.path.join(__get_cache_path(),packagename),os.path.join(__get_module_path(), packagename))
         return __import(packagename)
     else:
@@ -135,5 +156,30 @@ def test_import():
     global os
     import os
 
+def run(packagename, args=[]):
+    if is_installed(packagename):
+        __import(packagename)
+        return globals()[packagename].main(args)
+    else:
+        print("ERROR: Cannot run package, because it is not installed")
+    
+
 if __name__=="__main__":
     print("This script cannot be run, it must be imported.")
+    import sys
+    print(sys.argv)
+    action=None if len(sys.argv)<2 else sys.argv[1]
+    package=None if len(sys.argv)<3 else sys.argv[2]
+    pargs=sys.argv[3:]
+
+    if action=='run':
+        run(package, pargs)
+    elif action=='update':
+        update(package)
+    elif action=='install':
+        install(package)
+    elif action=='available':
+        for n in __get_available_packages():
+            print(n)
+    elif action=='uninstall':
+        uninstall(package)
